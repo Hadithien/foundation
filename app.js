@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 // ---------- state ----------
 const KEY = 'foundation.state.v1';
 const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], herb: [], quests: {}, ach: null, tdone: 0, theme: 'dark' });
@@ -217,8 +217,11 @@ const views = {
   settings() { return moreView(); },
   setpage() {
     return `<div class="card"><h2>Theme</h2><button data-act="theme">Toggle light / dark</button></div>
-      <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device. Export to move it to your phone or another PC.</p>
-      <div class="row"><button data-act="export">Export</button><label><button onclick="document.getElementById('imp').click()">Import</button><input id="imp" type="file" accept="application/json,.json,text/plain" hidden></label></div></div>
+      <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device. Make a backup code, keep it somewhere safe (notes, email), and paste it here to restore on any device.</p>
+      <div class="row"><button class="pri" data-act="mkcode">Make backup code</button><button data-act="export">Save as file</button></div>
+      ${bcode ? `<p><textarea id="bcode" readonly rows="4" style="font-family:monospace;font-size:.75rem">${esc(bcode)}</textarea></p><div class="row"><button data-act="copycode">Copy code</button><span class="dim">${bcode.length.toLocaleString()} characters</span></div>` : ''}
+      <p><textarea id="rcode" rows="3" placeholder="Paste a backup code here to restore"></textarea></p>
+      <div class="row"><button data-act="usecode">Restore from code</button><label><button onclick="document.getElementById('imp').click()">Restore from file</button><input id="imp" type="file" accept="application/json,.json,text/plain" hidden></label></div></div>
       <div class="card"><h2>Delete data</h2><p class="dim">Erase everything stored on this device: practice, journal, library, drawings, herbarium and progress.</p><button data-act="wipe">Delete all data</button></div>
       <div class="card"><h2>Donate</h2><p class="dim">Support the work behind Foundation.</p><button class="pri" data-act="donate">Donate</button></div>
       <div class="card"><h2>About</h2><p class="dim">Foundation — a private, offline app for practice, reflection and story. Install it from your browser menu ("Install app" / "Add to Home Screen").</p></div>`;
@@ -290,13 +293,54 @@ const A = {
     location.reload();
   },
   theme() { S.theme = S.theme === 'light' ? 'dark' : 'light'; },
+  async mkcode() { bcode = await encodeBackup(await gather()); render(); },
+  copycode() {
+    const t = document.getElementById('bcode'); if (!t) return;
+    t.select();
+    (navigator.clipboard ? navigator.clipboard.writeText(bcode) : Promise.reject()).catch(() => document.execCommand('copy')).then(() => alert('Code copied.'), () => alert('Code copied.'));
+  },
+  async usecode() {
+    const t = document.getElementById('rcode').value;
+    try { applyBackup(await decodeBackup(t)); } catch { alert('That backup code is not valid.'); }
+  },
   async export() {
     const a = document.createElement('a');
-    const data = Object.assign({}, S, { drawings: await Art.exportAll(), herbPhotos: await Herb.exportPhotos() });
+    const data = await gather();
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     a.download = `foundation-backup-${today()}.json`; a.click();
   }
 };
+let bcode = '';
+async function gather() { return Object.assign({}, S, { drawings: await Art.exportAll(), herbPhotos: await Herb.exportPhotos() }); }
+async function pipe(bytes, stream) {
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+}
+async function encodeBackup(data) {
+  let bytes = new TextEncoder().encode(JSON.stringify(data)), tag = 'FND0.';
+  if (window.CompressionStream) { bytes = await pipe(bytes, new CompressionStream('gzip')); tag = 'FND1.'; }
+  let bin = ''; for (let i = 0; i < bytes.length; i += 8192) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+  return tag + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+async function decodeBackup(code) {
+  const m = code.replace(/\s+/g, '').match(/^(FND[01])\.([A-Za-z0-9_-]+)$/);
+  if (!m) throw 0;
+  const b64 = m[2].replace(/-/g, '+').replace(/_/g, '/');
+  let bytes = Uint8Array.from(atob(b64 + '='.repeat((4 - b64.length % 4) % 4)), c => c.charCodeAt(0));
+  if (m[1] === 'FND1') bytes = await pipe(bytes, new DecompressionStream('gzip'));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+function applyBackup(d) {
+  const base = def();
+  if (!d || typeof d !== 'object' || !Object.keys(base).some(k => k in d)) throw 0;
+  if (!confirm('Replace everything on this device with the imported backup?')) return;
+  S = Object.assign(base, d);
+  for (const k of ['habits', 'journal', 'books', 'tasks', 'med']) if (!Array.isArray(S[k])) S[k] = [];
+  const dr = S.drawings, hp = S.herbPhotos; delete S.drawings; delete S.herbPhotos; S.ach = S.ach || null;
+  if (!Array.isArray(S.herb)) S.herb = [];
+  if (!S.quests || typeof S.quests !== 'object') S.quests = {}; S.drawn = +S.drawn || 0;
+  bcode = '';
+  return Promise.all([Art.importAll(dr || []), Herb.importPhotos(hp || [])]).then(() => { save(); render(); alert('Restored.'); });
+}
 function saveTimer() {
   if (timer) localStorage.setItem('foundation.timer', JSON.stringify({ start: timer.start, end: timer.end, min: timer.min }));
   else localStorage.removeItem('foundation.timer');
@@ -335,17 +379,7 @@ document.addEventListener('change', e => {
   if (el.matches('input[type=checkbox][data-act]')) { A[el.dataset.act](el); save(); render(); }
   if (el.id === 'imp' && el.files[0]) {
     el.files[0].text().then(txt => {
-      try {
-        const d = JSON.parse(txt), base = def();
-        if (!d || typeof d !== 'object' || !Object.keys(base).some(k => k in d)) throw 0;
-        if (!confirm('Replace everything on this device with the imported backup?')) return;
-        S = Object.assign(base, d);
-        for (const k of ['habits', 'journal', 'books', 'tasks', 'med']) if (!Array.isArray(S[k])) S[k] = [];
-        const dr = S.drawings, hp = S.herbPhotos; delete S.drawings; delete S.herbPhotos; S.ach = S.ach || null;
-        if (!Array.isArray(S.herb)) S.herb = [];
-        if (!S.quests || typeof S.quests !== 'object') S.quests = {}; S.drawn = +S.drawn || 0;
-        Promise.all([Art.importAll(dr || []), Herb.importPhotos(hp || [])]).then(() => { save(); render(); alert('Imported.'); });
-      } catch { alert('Invalid backup file.'); }
+      try { applyBackup(JSON.parse(txt)); } catch { alert('Invalid backup file.'); }
     });
   }
 });
