@@ -12,9 +12,13 @@ const yrs = v => v >= 1e5 ? nf(v) : Math.floor(v).toLocaleString();
 // ---------- world data ----------
 const REALM = [['Mortal Awakening', '🌱'], ['Qi Condensation', '💨'], ['Foundation Establishment', '🏛️'], ['Core Formation', '🟡'], ['Nascent Soul', '👶'], ['Spirit Transformation', '👻'], ['Void Refinement', '🌌'], ['Body Integration', '☯️'], ['Mahayana', '🪷'], ['Tribulation Transcendence', '⚡'], ['True Immortal', '🌟'], ['Dao Sovereign', '👑']];
 const LIFE = [80, 150, 300, 600, 1200, 2500, 5000, 10000, 20000, 50000, 150000, 1e6];
-const YEAR = 20; // seconds per year
+// Pacing: target days spent in each realm (about one year from Mortal to the peak)
+const RDAYS = [.09, .18, .37, .73, 1.5, 2.7, 5.5, 11, 22, 46, 92, 183];
+const YEARLEN = r => RDAYS[r] * 86400 / (LIFE[r] * .35); // seconds per in-game year
 const BASE = r => 2 * Math.pow(5.5, r);
-const CAP = (r, l) => 60 * Math.pow(18, r) * Math.pow(1.3, l - 1);
+const LSUM = (() => { let s = 0; for (let l = 1; l <= 9; l++) s += Math.pow(1.3, l - 1) * (l === 9 ? 1.5 : 1) / (1 + .12 * l); return s; })();
+const TYPMULT = 3; // assumed typical Qi multiplier
+const CAP = (r, l) => BASE(r) * RDAYS[r] * 86400 * TYPMULT / LSUM * Math.pow(1.3, l - 1);
 const STR = r => 0.1 * Math.pow(5, r), INSR = r => 0.25 * Math.pow(2, r), ESSR = r => 0.2 * Math.pow(3, r);
 const LBL = { qi: 'Qi', atk: 'Attack', def: 'Defense', life: 'Lifespan', bt: 'Breakthrough', stone: 'Spirit stones', herb: 'Herbs', ins: 'Insight', ess: 'Essence', pill: 'Pill potency' };
 const sText = (s, k = 1) => Object.entries(s).map(([x, v]) => `${v >= 0 ? '+' : ''}${nf(v * k)}% ${LBL[x]}`).join(' · ');
@@ -291,7 +295,7 @@ function advance(g, dt, offline) {
   g.t += dt * 1000;
   if (M.sect) M.sect.c += dt * .5 * (1 + g.realm * .5);
   g.qi += st.qps * dt; g.stones += st.stone * dt; g.herbs += st.herb * dt; g.ins += st.ins * dt; g.ess += st.ess * dt;
-  g.age += dt / YEAR; if (offline && g.age > st.life - 1) g.age = Math.max(g.age - dt / YEAR, st.life - 1);
+  const yl = YEARLEN(g.realm); g.age += dt / yl; if (offline && g.age > st.life - 1) g.age = Math.max(g.age - dt / yl, st.life - 1);
   for (const sl in M.eq) for (const id of M.eq[sl]) {
     const o = M.man[id]; if (!o || o.lvl >= 9) continue;
     o.xp += dt; const need = mastery(id, o.lvl); if (o.xp >= need) { o.xp -= need; o.lvl++; log(g, `📜 ${mById[id].name} reaches mastery level ${o.lvl}.`); }
@@ -307,7 +311,7 @@ function catchUp(g) {
   const now = Date.now(); let dt = (now - g.t) / 1000;
   if (dt < 0) { g.t = now; return; }
   if (dt > 2.5) {
-    const away = Math.min(dt, 4 * 3600), r0 = g.realm, s0 = g.stones;
+    const away = Math.min(dt, 12 * 3600), r0 = g.realm, s0 = g.stones;
     let left = away; const step = Math.max(5, away / 1500);
     while (left > 0) { const d = Math.min(step, left); advance(g, d, true); left -= d; }
     if (g.event === null && away > 120) newEvent(g);
