@@ -281,3 +281,9 @@ button.short{opacity:.6;filter:grayscale(.5)}
 .citem.sel{border-color:var(--acc);box-shadow:inset 0 0 0 2px var(--acc)}
 .altrack{position:relative;height:8px;border-radius:4px;margin:6px 0;background:linear-gradient(90deg,#7d1a13,#b8a77a,#2e7d32)}
 .altrack i{position:absolute;top:-4px;width:6px;height:16px;margin-left:-3px;background:var(--ink);border:1px solid var(--goldl);border-radius:2px}
+.lbrow{display:flex;align-items:center;gap:10px;padding:7px 8px;border-bottom:1px solid #8a6a3a44}
+.lbrow.me{background:#c9a14a33;border-radius:4px}
+.lbn{width:2rem;text-align:center;font-weight:bold}
+.lbname{flex:1;display:flex;flex-direction:column;min-width:0}
+.lbname b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbbp{font-variant-numeric:tabular-nums}

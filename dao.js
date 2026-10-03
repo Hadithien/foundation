@@ -193,6 +193,8 @@ function G() {
   if (!M.bonds) M.bonds = {};
   if (!Array.isArray(M.legend)) M.legend = [];
   if (M.sect === undefined) M.sect = null;
+  if (!M.pid) M.pid = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+  if (typeof M.bpBest !== 'number') M.bpBest = 0;
   return g;
 }
 let LB = 1; // bonus from real-life Qi
@@ -323,7 +325,7 @@ function catchUp(g) {
 
 // ---------- UI ----------
 let gOpen = false, gTab = 'cult', gLast = 0, gDown = false, gMsg = '', gMsgT = 0;
-const GTABS = [['cult', '☯', 'Cultivate'], ['man', '📜', 'Manuals'], ['body', '🧬', 'Body'], ['dao', '🌀', 'Dao'], ['alch', '⚗️', 'Alchemy'], ['quest', '⚔️', 'Quests'], ['heart', '🔄', 'Rebirth'], ['self', '🪪', 'Self'], ['world', '🏯', 'World']];
+const GTABS = [['cult', '☯', 'Cultivate'], ['man', '📜', 'Manuals'], ['body', '🧬', 'Body'], ['dao', '🌀', 'Dao'], ['alch', '⚗️', 'Alchemy'], ['quest', '⚔️', 'Quests'], ['heart', '🔄', 'Rebirth'], ['self', '🪪', 'Self'], ['world', '🏯', 'World'], ['rank', '🏆', 'Rank']];
 const gmsg = t => { gMsg = t; gMsgT = Date.now() + 3000; const el = document.getElementById('gm-msg'); if (el) { el.textContent = t; el.classList.add('on'); } };
 const bar = (k, p) => `<div class="bar"><i data-w="${k}" style="width:${Math.min(100, Math.max(0, p))}%"></i></div>`;
 const aff = ok => ok ? '' : ' short';
@@ -472,7 +474,44 @@ function vWorld(g, st) {
     <div class="altrack"><i style="left:${(al + 100) / 2}%"></i></div><div class="row sb tiny dim"><span>Demonic</span><span>Neutral</span><span>Righteous</span></div>
     <p class="dim tiny">Your choices in fate encounters shape your reputation. ${al >= 25 ? 'The orthodox world favours you (+breakthrough).' : al <= -25 ? 'Heterodox power flows through you (+Qi, +attack).' : 'Reach 25 either way to earn a boon.'}</p></div>` + sect + bonds;
 }
-const VIEWS = { cult: vCult, man: vMan, body: vBody, dao: vDao, alch: vAlch, quest: vQuest, heart: vHeart, self: vSelf, world: vWorld };
+// ---------- global leaderboard (Supabase) ----------
+// Your player id lives in the game data, so it travels inside the export code.
+const LBCFG = { url: '', key: '' };
+const LBD = { rows: null, t: 0, err: '', busy: false }, LBS = { sig: '', t: 0 };
+async function lbCall(fn, body) {
+  const r = await fetch(`${LBCFG.url}/rest/v1/rpc/${fn}`, { method: 'POST', headers: { apikey: LBCFG.key, Authorization: 'Bearer ' + LBCFG.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+async function lbSubmit(g, force) {
+  if (!LBCFG.url || !g.path || !navigator.onLine) return;
+  const M = g.meta, sig = [M.id.name, M.top, Math.round(M.bpBest)].join('|');
+  if (!force && (sig === LBS.sig || Date.now() - LBS.t < 60000)) return;
+  LBS.t = Date.now();
+  try { await lbCall('lb_submit', { p_pid: M.pid, p_name: M.id.name, p_realm: M.top, p_bp: M.bpBest }); LBS.sig = sig; } catch (e) { LBD.err = 'Could not reach the leaderboard.'; }
+}
+async function lbFetch(g) {
+  if (LBD.busy || !LBCFG.url) return;
+  LBD.busy = true;
+  try { await lbSubmit(g, true); LBD.rows = await lbCall('lb_top', { p_pid: g.meta.pid, p_n: 50 }); LBD.err = ''; }
+  catch (e) { LBD.err = 'Could not reach the leaderboard. Check your connection.'; }
+  LBD.busy = false; LBD.t = Date.now();
+  if (gOpen && gTab === 'rank' && !document.activeElement.matches('input,textarea,select')) gRender();
+}
+function vRank(g) {
+  const M = g.meta;
+  if (!LBCFG.url) return `<div class="card gcard"><h2>Leaderboard</h2><p class="dim">The global leaderboard is not connected yet.</p></div>`;
+  if (!LBD.busy && Date.now() - LBD.t > 60000) lbFetch(g);
+  const medal = i => ['🥇', '🥈', '🥉'][i - 1] || i;
+  const rows = (LBD.rows || []).map(r => `<div class="lbrow${r.me ? ' me' : ''}"><span class="lbn">${medal(r.rank)}</span><span class="lbname"><b>${esc(r.name)}</b><small class="dim">${REALM[r.realm] ? REALM[r.realm][0] : ''}</small></span><span class="lbbp">⚔️ ${nf(r.bp)}</span></div>`).join('');
+  return `<div class="card gcard"><div class="row sb"><h2>Global Leaderboard</h2><button data-g="lbrefresh"${LBD.busy ? ' disabled' : ''}>${LBD.busy ? '…' : '↻'}</button></div>
+    <p class="dim tiny">Ranked by highest realm, then battle power. Your best is sent automatically, tied to your backup code, so restoring it on another device keeps your place.</p>
+    <p class="center">Your best: <b>${REALM[M.top][0]}</b> · ⚔️ <b>${nf(M.bpBest)}</b></p>
+    ${M.id.name ? '' : '<p class="acc tiny center">Name your character in the Self tab to appear under your own name.</p>'}
+    ${LBD.err ? `<p class="short tiny center">${LBD.err}</p>` : ''}
+    ${rows || `<p class="dim center">${LBD.busy ? 'Loading…' : 'No cultivators yet.'}</p>`}</div>`;
+}
+const VIEWS = { cult: vCult, man: vMan, body: vBody, dao: vDao, alch: vAlch, quest: vQuest, heart: vHeart, self: vSelf, world: vWorld, rank: vRank };
 
 function gRender() {
   const root = document.getElementById('gm'); if (!root) return;
@@ -586,6 +625,7 @@ const GA = {
   },
   reborn(el, g) { if (confirm(`Reincarnate now for +${karmaFor(g)} Karma? You will restart at the beginning of your path.`)) { reborn(g, 'reborn'); gTab = 'cult'; } },
   ascend(el, g) { if (g.realm === REALM.length - 1 && g.layer === 9 && g.qi >= cost(g) && confirm('Ascend beyond the world? You are reborn with a large Karma reward and a permanent +25% Qi bonus.')) { reborn(g, 'ascend'); gTab = 'cult'; } },
+  lbrefresh(el, g) { LBD.t = 0; lbFetch(g); },
   kup(el, g) { const id = el.dataset.id, l = g.meta.ups[id] || 0, c = kCost(id, l); if (l < KUP[id][3] && gSpend(g.meta, 'karma', c, 'Karma')) g.meta.ups[id] = l + 1; }
 };
 
@@ -596,6 +636,7 @@ function gTick() {
   try {
     LB = Math.min(4, 1 + qi() / 1000);
     const g = G(), before = g.realm; catchUp(g);
+    g.meta.bpBest = Math.max(g.meta.bpBest, gstats(g).pow); lbSubmit(g);
     if (Date.now() - sv > 10000) { save(); sv = Date.now(); }
     if (gOpen) { if (!gDown && Date.now() - gLast > 3000 && !document.activeElement.matches('input,textarea,select')) gRender(); else gLive(); }
     if (g.realm !== before) { /* achievements refresh on next render */ }
