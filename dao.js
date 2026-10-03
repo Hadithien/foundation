@@ -99,8 +99,8 @@ const kCost = (id, l) => Math.ceil(5 * Math.pow(1.7, l));
 // ---------- fate events ----------
 const EVENTS = [
   ['A Dying Elder', 'An old cultivator lies bleeding by the road, clutching a worn jade slip.', [
-    ['Tend his wounds', [[.7, { ins: 240 }, 'He imparts a fragment of his Dao before passing.'], [.3, { manual: 1 }, 'He presses a secret manual into your hands.']]],
-    ['Take the jade slip', [[.5, { stones: 500 }, 'The slip holds a hidden cache of spirit stones.'], [.5, { years: 18 }, 'A death curse clings to you.']]],
+    ['Tend his wounds', [[.7, { ins: 240, al: 10 }, 'He imparts a fragment of his Dao before passing.'], [.3, { manual: 1 }, 'He presses a secret manual into your hands.']]],
+    ['Take the jade slip', [[.5, { stones: 500 }, 'The slip holds a hidden cache of spirit stones.'], [.5, { years: 18, al: -8 }, 'A death curse clings to you.']]],
     ['Walk on', [[1, {}, 'You travel on, untroubled.']]]]],
   ['Spirit Spring', 'A spring of liquid Qi bubbles from a mossy crack in the rock.', [
     ['Bathe in it', [[.8, { qi: 500 }, 'Qi floods your meridians.'], [.2, { qi: 120, years: -8 }, 'The water leaves you lighter and younger.']]],
@@ -109,7 +109,7 @@ const EVENTS = [
     ['Break the seal', [[.35, { manual: 1 }, 'You discover a hidden inheritance.'], [.3, { ess: 400, stones: 200 }, 'You loot the treasures.'], [.35, { years: 25 }, 'Guardian ghosts drain your vitality.']]],
     ['Study the runes', [[1, { ins: 200 }, 'The old formations teach you something.']]]]],
   ['Bandit Ambush', 'Robbers drop from the trees, blades drawn.', [
-    ['Fight them', [[.65, { stones: 350, ess: 120 }, 'They fall and you take their purses.'], [.35, { years: 10 }, 'You win, but are wounded.']]],
+    ['Fight them', [[.65, { stones: 350, ess: 120, al: 5 }, 'They fall and you take their purses.'], [.35, { years: 10 }, 'You win, but are wounded.']]],
     ['Pay them off', [[1, { stones: -150 }, 'You hand over some stones and move on.']]]]],
   ['Heavenly Phenomenon', 'Auspicious clouds gather and the sky glows with purple light.', [
     ['Comprehend the Dao', [[1, { ins: 600 }, 'Fragments of truth drift into your mind.']]],
@@ -118,8 +118,8 @@ const EVENTS = [
     ['Meditate beneath them', [[1, { herbs: 10, years: -10 }, 'The grove shares its quiet strength.']]],
     ['Plant a spirit seed', [[.8, { bt: 12 }, 'The seed takes root, strengthening your resolve.'], [.2, { bt: 4, herbs: 20 }, 'It blooms into a handful of herbs.']]]]],
   ['Demonic Temptation', 'A red mist whispers an easy path to power.', [
-    ['Accept the whisper', [[.7, { qi: 1600, years: 25 }, 'Power surges in, but it costs years.'], [.3, { qi: 400, ins: -1 }, 'The whisper fades, leaving a hollow gift.']]],
-    ['Refuse', [[1, { ins: 160 }, 'Your Dao heart steadies.']]]]],
+    ['Accept the whisper', [[.7, { qi: 1600, years: 25, al: -15 }, 'Power surges in, but it costs years.'], [.3, { qi: 400, al: -15 }, 'The whisper fades, leaving a hollow gift.']]],
+    ['Refuse', [[1, { ins: 160, al: 10 }, 'Your Dao heart steadies.']]]]],
   ['Sect Recruiters', 'Elders of a rising sect offer you a place among them.', [
     ['Accept a post', [[1, { stones: 700, herbs: 4 }, 'You receive a stipend and supplies.']]],
     ['Decline politely', [[.6, { ins: 100 }, 'Free of obligations, you reflect.'], [.4, { stones: 100 }, 'They leave you a parting gift.']]]]],
@@ -134,6 +134,48 @@ const EVENTS = [
     ['Trade stories', [[1, { ins: 140, herbs: 3 }, 'He shares an old alchemical secret.']]]]]
 ];
 
+// ---------- identity & world ----------
+const ORIG = {
+  orphan: ['🏚️', 'Village Orphan', 'Raised by a whole village, hungry for the Dao.', { ins: 15, bt: 2 }],
+  noble: ['🏯', 'Fallen Noble House', 'Your family name once carried weight. You carry its debts and its books.', { stone: 30, def: 10 }],
+  herb: ['🌿', "Herbalist's Child", 'You grew up among drying roots and the smell of rain.', { herb: 40, life: 5 }],
+  sword: ['🗡️', "Wandering Swordsman's Ward", 'A stranger left you a blade and a single lesson.', { atk: 30 }],
+  acol: ['🛕', 'Temple Acolyte', 'Years of chanting taught you stillness.', { life: 8, ins: 8 }],
+  clan: ['🐺', 'Beast-Tamer Clan', 'Your people lived beside the wild things, not above them.', { ess: 20, def: 15 }]
+};
+const TEMP = {
+  calm: ['🌊', 'Serene', 'Still water reflects the sky.', { ins: 10, bt: 1 }], fierce: ['🔥', 'Fierce', 'You answer insult with steel.', { atk: 15, qi: 10 }],
+  kind: ['🌸', 'Compassionate', 'You cannot walk past suffering.', { herb: 15, life: 5 }], cunning: ['🦊', 'Cunning', 'Every road has a toll; you know the price.', { stone: 15, bt: 1 }]
+};
+const SECT = {
+  azure: ['☁️', 'Azure Cloud Sect', 'An orthodox sect upon the cloud peaks. Disciplined, honourable, wealthy.', { bt: 1, stone: 8 }, 1],
+  blood: ['🌙', 'Blood Moon Hall', 'A demonic hall that prizes strength above all.', { qi: 10, atk: 10 }, -1],
+  grove: ['🌳', 'Verdant Grove Circle', 'Druidic hermits who speak with roots and rivers.', { herb: 15, life: 2 }, 1],
+  iron: ['⚔️', 'Iron Sword Pavilion', 'Swordsmen who judge a person by their edge.', { atk: 20, def: 5 }, 0],
+  wander: ['🧭', 'Wandering Rogues', 'No walls, no master. Only the road.', { stone: 5, ins: 5 }, 0]
+};
+const RANKS = [['Outer Disciple', 0, 0], ['Inner Disciple', 1, 200], ['Core Disciple', 3, 1000], ['Elder', 5, 5000], ['Grand Elder', 7, 20000], ['Patriarch', 9, 80000]];
+const NPC = {
+  lin: ['🧙', 'Master Lin Qingshan', 'Mentor', 0, 'A retired elder who sees something in you.', { ins: 5, bt: .5 },
+    ['"Patience is also cultivation, child."', '"I once chased the sky. Now I chase the tea."', '"Your Qi is restless. Good. Restless things grow."']],
+  mu: ['👵', 'Granny Mu', 'Herbalist', 0, 'She sells roots, rumours and remedies.', { herb: 12, life: 1.5 },
+    ['"Eat something. A cultivator who starves is just a ghost with ambition."', '"This moss only grows where a dragon once slept."', '"The forest keeps accounts, you know."']],
+  han: ['🗡️', 'Han Feng', 'Rival', 1, 'A proud swordsman who refuses to let you walk ahead.', { atk: 10, qi: 3 },
+    ['"Do not mistake my respect for weakness."', '"One day I will cross the heavens before you."', '"...Your stance has improved. Tell no one I said so."']],
+  zhao: ['🪙', 'Merchant Zhao', 'Trader', 1, 'He knows the price of everything, even secrets.', { stone: 12 },
+    ['"A fair price is one both sides complain about."', '"I hear a tomb has opened to the north."', '"For you? A friend\'s discount. Only slightly inflated."']],
+  su: ['🌸', 'Su Ruoxue', 'Dao Companion', 2, 'A wandering healer whose path keeps crossing yours.', { qi: 10, ins: 5 },
+    ['"Walk beside me a while. The road is shorter in company."', '"Do you ever wonder who we were before the Dao?"', '"Come back alive. That is all I ask."']],
+  hei: ['🦇', 'Heiyan', 'Demonic Wanderer', 3, 'A smiling stranger who offers terrible bargains.', { qi: 8, atk: 8 },
+    ['"Righteous, demonic... just words people use to feel clean."', '"Power asks no questions. Why should you?"', '"Ah, my favourite hypocrite returns."']]
+};
+const LOC = ['Mist-Veiled Village', 'Azure Market Town', 'Sect Mountain Gate', 'Golden Plains Citadel', 'Floating Peak Palace', 'Spirit Realm Gateway', 'Void Frontier', 'Celestial Capital', 'Heavenly Court Outskirts', 'Thunder Sea', 'Immortal Isles', 'Throne of the Dao'];
+const alLbl = a => a >= 60 ? 'Paragon of Righteousness' : a >= 25 ? 'Righteous' : a > -25 ? 'Neutral Wanderer' : a > -60 ? 'Heterodox' : 'Demonic Overlord';
+const bondLv = (M, id) => Math.min(5, Math.floor(((M.bonds[id] || {}).aff || 0) / 60));
+const rivalPow = g => 10 * Math.pow(5.5, g.realm) * (1 + .1 * g.layer) * 1.3;
+function leg(g, text) { const L = g.meta.legend; L.unshift({ d: new Date().toISOString().slice(0, 10), t: text }); if (L.length > 150) L.length = 150; }
+const nm = g => g.meta.id.name || 'the Nameless Cultivator';
+
 // ---------- game state ----------
 const newGame = () => ({ v: 1, t: Date.now(), qi: 0, realm: 0, layer: 1, age: 0, stones: 0, herbs: 0, ess: 0, ins: 0, pills: {}, btBoost: 0, buff: 0, mer: 0, dao: {}, chosen: [],
   path: '', phys: 'mortal', auto: true, autoBt: false, exp: null, event: null, nextEv: Date.now() + 200000, log: [], hist: { y: 0, k: 0 },
@@ -141,6 +183,12 @@ const newGame = () => ({ v: 1, t: Date.now(), qi: 0, realm: 0, layer: 1, age: 0,
 function G() {
   let g = S.game;
   if (!g || typeof g !== 'object' || !g.meta) g = S.game = newGame();
+  const M = g.meta;
+  M.id = Object.assign({ name: '', epithet: '', origin: '', temper: '', motto: '', story: '' }, M.id);
+  if (typeof M.al !== 'number') M.al = 0;
+  if (!M.bonds) M.bonds = {};
+  if (!Array.isArray(M.legend)) M.legend = [];
+  if (M.sect === undefined) M.sect = null;
   return g;
 }
 let LB = 1; // bonus from real-life Qi
@@ -155,6 +203,10 @@ function gstats(g) {
   for (const id of g.chosen) { const l = g.dao[id] || 0; if (l) add(DAO[id][2], l, sc); }
   for (const [a, c, s] of SYN) if (g.chosen.includes(a) && g.chosen.includes(c) && (g.dao[a] || 0) >= 3 && (g.dao[c] || 0) >= 3) add(s, 1, sc);
   const p = PATH[g.path]; if (p) add(p[3]);
+  const I = M.id; if (ORIG[I.origin]) add(ORIG[I.origin][3]); if (TEMP[I.temper]) add(TEMP[I.temper][3]);
+  if (M.sect && SECT[M.sect.id]) add(SECT[M.sect.id][3], M.sect.rank + 1);
+  for (const id in NPC) { const l = bondLv(M, id); if (l) add(NPC[id][5], l); }
+  if (M.al >= 25) add({ bt: 2 }); else if (M.al <= -25) add({ qi: 12, atk: 10 });
   const buffOn = g.buff > g.t;
   const qps = BASE(r) * (1 + .12 * g.layer) * Math.max(.1, 1 + b.qi / 100) * (1 + .1 * (u.flame || 0) + .25 * M.asc) * LB * (buffOn ? 2 : 1);
   const life = LIFE[r] * Math.max(.3, 1 + (b.life + 10 * (u.life || 0)) / 100);
@@ -178,11 +230,13 @@ function reborn(g, why) {
   M.top = Math.max(M.top, sr);
   log(g, why === 'ascend' ? `✨ You ascend beyond the world! +${k} Karma.` : why === 'died' ? `💀 Your lifespan ran out. You are reborn with +${k} Karma.` : `🔄 You reincarnate with +${k} Karma.`);
   g.hist.k = k; g.hist.y = why;
+  leg(g, why === 'ascend' ? `${nm(g)} ascended beyond the world.` : why === 'died' ? `${nm(g)} lived out their years and was reborn. Life ${M.lives} begins.` : `${nm(g)} chose reincarnation. Life ${M.lives} begins.`);
 }
 const gPart = (g, x) => { /* helper placeholder for readability */ return x; };
 
 function fx(g, st, e) {
-  const out = [], add = (k, v, t) => { out.push(t); };
+  const out = [];
+  if (e.al) { g.meta.al = Math.max(-100, Math.min(100, g.meta.al + e.al)); out.push(e.al > 0 ? 'righteousness grows' : 'your heart darkens'); }
   if (e.qi) { const v = st.qps * e.qi; g.qi += v; out.push(`+${nf(v)} Qi`); }
   if (e.stones) { const v = st.stone * e.stones * (e.stones > 0 ? 1 : 1); g.stones = Math.max(0, g.stones + v); out.push(`${v >= 0 ? '+' : ''}${nf(v)} stones`); }
   if (e.herbs) { g.herbs += e.herbs * (1 + .3 * g.realm); out.push(`+${nf(e.herbs * (1 + .3 * g.realm))} herbs`); }
@@ -227,6 +281,7 @@ function tryBreak(g, st) {
   if (ok) {
     g.qi = 0; g.realm++; g.layer = 1; g.meta.top = Math.max(g.meta.top, g.realm); g.age = Math.min(g.age, LIFE[g.realm] * .3);
     log(g, `🌟 Breakthrough! You enter the ${REALM[g.realm][0]} realm.`);
+    leg(g, `${nm(g)} broke through to the ${REALM[g.realm][0]} realm at ${LOC[g.realm]}.`);
   } else {
     g.qi *= .7; g.age += 3; log(g, '💥 The breakthrough fails. Your Qi backlashes (-30% Qi, +3 years).');
   }
@@ -234,6 +289,7 @@ function tryBreak(g, st) {
 function advance(g, dt, offline) {
   const st = gstats(g), M = g.meta;
   g.t += dt * 1000;
+  if (M.sect) M.sect.c += dt * .5 * (1 + g.realm * .5);
   g.qi += st.qps * dt; g.stones += st.stone * dt; g.herbs += st.herb * dt; g.ins += st.ins * dt; g.ess += st.ess * dt;
   g.age += dt / YEAR; if (offline && g.age > st.life - 1) g.age = Math.max(g.age - dt / YEAR, st.life - 1);
   for (const sl in M.eq) for (const id of M.eq[sl]) {
@@ -263,7 +319,7 @@ function catchUp(g) {
 
 // ---------- UI ----------
 let gOpen = false, gTab = 'cult', gLast = 0, gDown = false, gMsg = '', gMsgT = 0;
-const GTABS = [['cult', '☯', 'Cultivate'], ['man', '📜', 'Manuals'], ['body', '🧬', 'Body'], ['dao', '🌀', 'Dao'], ['alch', '⚗️', 'Alchemy'], ['quest', '⚔️', 'Quests'], ['heart', '🔄', 'Rebirth']];
+const GTABS = [['cult', '☯', 'Cultivate'], ['man', '📜', 'Manuals'], ['body', '🧬', 'Body'], ['dao', '🌀', 'Dao'], ['alch', '⚗️', 'Alchemy'], ['quest', '⚔️', 'Quests'], ['heart', '🔄', 'Rebirth'], ['self', '🪪', 'Self'], ['world', '🏯', 'World']];
 const gmsg = t => { gMsg = t; gMsgT = Date.now() + 3000; const el = document.getElementById('gm-msg'); if (el) { el.textContent = t; el.classList.add('on'); } };
 const bar = (k, p) => `<div class="bar"><i data-w="${k}" style="width:${Math.min(100, Math.max(0, p))}%"></i></div>`;
 const aff = ok => ok ? '' : ' short';
@@ -275,10 +331,11 @@ function vCult(g, st) {
   const act = last ? `<button class="pri big" data-g="ascend"${rdy ? '' : ' disabled'}>✨ Ascend beyond the world</button>`
     : g.layer < 9 ? `<button class="big" data-g="adv"${rdy && !g.auto ? '' : ' disabled'}>${g.auto ? 'Auto-advancing' : 'Advance to layer ' + (g.layer + 1)}</button>`
       : `<button class="pri big" data-g="adv"${rdy ? '' : ' disabled'}>⚡ Attempt Breakthrough · ${Math.round(st.bt)}%</button>`;
-  const ev = g.event !== null ? `<button class="fate" data-g="tab" data-id="quest">🎴 A fate encounter awaits: ${EVENTS[g.event][0]}</button>` : '';
+  const ev = (g.meta.id.name ? '' : `<button class="fate" data-g="tab" data-id="self">🪪 Create your character: give your cultivator a name and a past</button>`) + (g.event !== null ? `<button class="fate" data-g="tab" data-id="quest">🎴 A fate encounter awaits: ${EVENTS[g.event][0]}</button>` : '');
   return `<div class="card gcard">
     <div class="aura" data-g="tap" role="button" aria-label="Circulate Qi" style="--h:${(g.realm * 31 + 20) % 360}"><i></i><i></i><i></i><span>${REALM[g.realm][1]}</span></div>
-    <h2 class="gt">${REALM[g.realm][0]}</h2>
+    <h2 class="gt">${esc(g.meta.id.name || REALM[g.realm][0])}</h2>
+    <p class="center acc tiny" style="margin:0">${g.meta.id.name ? esc(REALM[g.realm][0]) + (g.meta.id.epithet ? ' · ' + esc(g.meta.id.epithet) : '') + ' · ' : ''}${LOC[g.realm]}</p>
     <p class="center dim">Layer ${g.layer} of 9 · ${P[0]} ${P[1]} · ${PHYS[g.phys][1]}</p>
     ${bar('qi', g.qi / need * 100)}
     <div class="row sb"><span><b data-b="qi">${nf(g.qi)}</b> / ${nf(need)} Qi</span><span class="dim">+<b data-b="qps">${nf(st.qps)}</b>/s${st.buffOn ? ' ✨×2' : ''}</span></div>
@@ -371,7 +428,47 @@ function vHeart(g, st) {
     ${Object.entries(KUP).map(([id, k]) => { const l = M.ups[id] || 0, c = kCost(id, l); return `<div class="mcard"><div class="row sb"><b>${k[0]} ${k[1]}</b><small class="gl">${l}/${k[3]}</small></div><small class="wrap dim">${k[2]}</small>
       <div class="row sb"><span></span>${l < k[3] ? `<button data-g="kup" data-id="${id}" class="${aff(M.karma >= c)}">🔮 ${c}</button>` : '<b class="acc">Max</b>'}</div></div>`; }).join('')}</div>`;
 }
-const VIEWS = { cult: vCult, man: vMan, body: vBody, dao: vDao, alch: vAlch, quest: vQuest, heart: vHeart };
+function vSelf(g, st) {
+  const M = g.meta, I = M.id, pick = (T, key, act) => Object.entries(T).map(([id, o]) => `<button class="citem${I[key] === id ? ' sel' : ''}" data-g="${act}" data-id="${id}"><span class="em">${o[0]}</span><span class="gr"><b>${o[1]}</b><small class="wrap">${o[2]}</small><small class="wrap acc">${sText(o[3])}</small></span></button>`).join('');
+  return `<div class="card gcard"><h2>Your Character</h2><p class="dim tiny">Who are you in the jianghu? Write your own story; the world will answer.</p>
+    <label class="fl">Name</label><input id="id-name" maxlength="30" value="${esc(I.name)}" placeholder="e.g. Lan Wuxian">
+    <label class="fl">Epithet / Dao name</label><input id="id-ep" maxlength="40" value="${esc(I.epithet)}" placeholder="e.g. Wanderer of the Green Mist">
+    <label class="fl">Motto</label><input id="id-motto" maxlength="80" value="${esc(I.motto)}" placeholder="e.g. The mountain does not hurry">
+    <label class="fl">Backstory</label><textarea id="id-story" rows="4" maxlength="800" placeholder="Where were you born? What do you seek?">${esc(I.story)}</textarea>
+    <button class="pri big" data-g="ident">Save character</button></div>
+    <div class="card gcard"><h2>Origin</h2>${pick(ORIG, 'origin', 'orig')}</div>
+    <div class="card gcard"><h2>Temperament</h2>${pick(TEMP, 'temper', 'temp')}</div>
+    <div class="card gcard"><div class="row sb"><h2>Legend of ${esc(nm(g))}</h2><span class="dim tiny">${M.legend.length} entries</span></div>
+      <textarea id="leg-in" rows="2" maxlength="300" placeholder="Record a moment of your story..."></textarea><button data-g="legadd" class="big">Add to Legend</button>
+      ${M.legend.slice(0, 20).map(l => `<p class="glog"><span class="dim">${l.d}</span> ${esc(l.t)}</p>`).join('') || '<p class="dim">Your legend is yet unwritten.</p>'}</div>`;
+}
+function vWorld(g, st) {
+  const M = g.meta, S_ = M.sect, al = M.al;
+  let sect;
+  if (S_ && SECT[S_.id]) {
+    const sc = SECT[S_.id], nx = RANKS[S_.rank + 1];
+    sect = `<div class="card gcard"><div class="row sb"><h2>${sc[0]} ${sc[1]}</h2><span class="dim">${RANKS[S_.rank][0]}</span></div><p class="dim tiny">${sc[2]}</p>
+      <small class="wrap acc">${sText(sc[3], S_.rank + 1)}</small>
+      <div class="row sb"><span>Contribution <b data-b="contrib">${nf(S_.c)}</b></span><span class="dim tiny">${nx ? 'Next: ' + nx[0] : 'Highest rank'}</span></div>
+      ${nx ? `<button class="big${aff(S_.c >= nx[2] && g.realm >= nx[1])}" data-g="promote">Seek promotion to ${nx[0]} · ${nf(nx[2])} contrib${g.realm >= nx[1] ? '' : ' · needs ' + REALM[nx[1]][0]}</button>` : ''}
+      <div class="row"><button data-g="mission"${g.t < (S_.cd || 0) ? ' disabled' : ''}>📜 Sect mission</button><button data-g="leave">Leave sect</button></div></div>`;
+  } else {
+    sect = `<div class="card gcard"><h2>Sects of the Jianghu</h2><p class="dim tiny">Join a sect for lasting bonuses that grow with your rank. Rank and contribution are kept across reincarnations.</p>
+      ${Object.entries(SECT).map(([id, s]) => `<button class="citem" data-g="join" data-id="${id}"><span class="em">${s[0]}</span><span class="gr"><b>${s[1]}</b><small class="wrap">${s[2]}</small><small class="wrap acc">${sText(s[3])} per rank</small></span></button>`).join('')}</div>`;
+  }
+  const bonds = `<div class="card gcard"><h2>Bonds</h2><p class="dim tiny">People you meet as you rise. Talk and share gifts to deepen bonds and gain their lasting favour.</p>
+    ${Object.entries(NPC).map(([id, n]) => {
+      if (g.meta.top < n[3] && g.realm < n[3]) return `<div class="mcard dim">❔ A figure waits beyond the ${REALM[n[3]][0]} realm.</div>`;
+      const b = M.bonds[id] || { aff: 0 }, l = bondLv(M, id), cd = g.t < (b.cd || 0), gift = STR(g.realm) * 300;
+      return `<div class="mcard${l >= 5 ? ' on' : ''}"><div class="row sb"><b>${n[0]} ${n[1]}</b><small class="gl">${n[2]} · Bond ${l}/5</small></div><small class="wrap dim">${n[4]}</small>
+        <small class="wrap acc">${sText(n[5], Math.max(1, l))}${l ? '' : ' (at bond 1)'}</small>${l < 5 ? bar('b' + id, (b.aff % 60) / 60 * 100) : ''}
+        <div class="row"><button data-g="talk" data-id="${id}"${cd ? ' disabled' : ''}>💬 Talk</button><button data-g="gift" data-id="${id}" class="${aff(g.stones >= gift)}">🎁 Gift 💎${nf(gift)}</button>${id === 'han' ? `<button data-g="spar" data-id="han"${g.t < (b.cd2 || 0) ? ' disabled' : ''}>⚔️ Spar (${Math.round(Math.pow(st.pow / rivalPow(g), 2.5) / (1 + Math.pow(st.pow / rivalPow(g), 2.5)) * 100)}%)</button>` : ''}</div></div>`;
+    }).join('')}</div>`;
+  return `<div class="card gcard"><h2>Standing in the World</h2><p class="center gt" style="font-size:1.05rem">${alLbl(al)}</p>
+    <div class="altrack"><i style="left:${(al + 100) / 2}%"></i></div><div class="row sb tiny dim"><span>Demonic</span><span>Neutral</span><span>Righteous</span></div>
+    <p class="dim tiny">Your choices in fate encounters shape your reputation. ${al >= 25 ? 'The orthodox world favours you (+breakthrough).' : al <= -25 ? 'Heterodox power flows through you (+Qi, +attack).' : 'Reach 25 either way to earn a boon.'}</p></div>` + sect + bonds;
+}
+const VIEWS = { cult: vCult, man: vMan, body: vBody, dao: vDao, alch: vAlch, quest: vQuest, heart: vHeart, self: vSelf, world: vWorld };
 
 function gRender() {
   const root = document.getElementById('gm'); if (!root) return;
@@ -384,7 +481,7 @@ function gLive() {
   const root = document.getElementById('gm'); if (!root) return;
   const g = G(), st = gstats(g), set = (k, v) => root.querySelectorAll(`[data-b="${k}"]`).forEach(e => { if (e.textContent !== v) e.textContent = v; });
   set('qi', nf(g.qi)); set('qps', nf(st.qps)); set('age', yrs(g.age)); set('ins', nf(g.ins)); set('herbs', nf(g.herbs)); set('stones', nf(g.stones));
-  set('nev', tf((g.nextEv - g.t) / 1000)); if (g.exp) set('exp', tf((g.exp.end - g.t) / 1000));
+  set('nev', tf((g.nextEv - g.t) / 1000)); if (g.meta.sect) set('contrib', nf(g.meta.sect.c)); if (g.exp) set('exp', tf((g.exp.end - g.t) / 1000));
   const w = (k, p) => root.querySelectorAll(`[data-w="${k}"]`).forEach(e => e.style.width = Math.min(100, Math.max(0, p)) + '%');
   const need = cost(g); w('qi', g.qi / need * 100); w('age', g.age / st.life * 100); if (g.exp) w('exp', (g.t - g.exp.start) / (g.exp.end - g.exp.start) * 100);
   const res = root.querySelector('#gm-res'); if (res) res.innerHTML = `<span>💎 ${nf(g.stones)}</span><span>🌿 ${nf(g.herbs)}</span><span>🩸 ${nf(g.ess)}</span><span>👁️ ${nf(g.ins)}</span><span>🔮 ${nf(g.meta.karma)}</span>`;
@@ -411,6 +508,44 @@ const gSpend = (g, k, n, what) => { if (g[k] >= n) { g[k] -= n; return true; } g
 
 const GA = {
   close() { gClose(); },
+  ident(el, g) {
+    const v = id => (document.getElementById(id) || {}).value || '', I = g.meta.id, was = I.name;
+    I.name = v('id-name').trim().slice(0, 30); I.epithet = v('id-ep').trim().slice(0, 40); I.motto = v('id-motto').trim().slice(0, 80); I.story = v('id-story').trim().slice(0, 800);
+    if (I.name && !was) leg(g, `${I.name} set out upon the Dao.`); gmsg('Character saved.');
+  },
+  orig(el, g) { g.meta.id.origin = el.dataset.id; leg(g, `${nm(g)} is of origin: ${ORIG[el.dataset.id][1]}.`); },
+  temp(el, g) { g.meta.id.temper = el.dataset.id; },
+  legadd(el, g) { const t = ((document.getElementById('leg-in') || {}).value || '').trim(); if (t) { leg(g, t); gmsg('Added to your Legend.'); } },
+  join(el, g) { const id = el.dataset.id; g.meta.sect = { id, rank: 0, c: 0, cd: 0 }; leg(g, `${nm(g)} joined the ${SECT[id][1]}.`); if (SECT[id][4]) g.meta.al = Math.max(-100, Math.min(100, g.meta.al + SECT[id][4] * 10)); },
+  leave(el, g) { if (confirm('Leave your sect? Your rank and contribution will be lost.')) { leg(g, `${nm(g)} left the ${SECT[g.meta.sect.id][1]}.`); g.meta.sect = null; } },
+  promote(el, g) {
+    const s = g.meta.sect, n = RANKS[s.rank + 1]; if (!n) return;
+    if (g.realm < n[1]) return gmsg('Your realm is too low for this rank.'); if (s.c < n[2]) return gmsg('Not enough contribution.');
+    s.c -= n[2]; s.rank++; log(g, `🏯 You are promoted to ${n[0]}.`); leg(g, `${nm(g)} was promoted to ${n[0]} of the ${SECT[s.id][1]}.`);
+  },
+  mission(el, g, st) {
+    const s = g.meta.sect; if (g.t < s.cd) return;
+    const c = 40 * (1 + g.realm) * (1 + s.rank * .5), sg = st.stone * 90; s.c += c; g.stones += sg; s.cd = g.t + 60000;
+    log(g, `📜 Sect mission done: +${nf(c)} contribution, +${nf(sg)} stones.`); gmsg('Mission complete.');
+  },
+  talk(el, g) {
+    const id = el.dataset.id, b = g.meta.bonds[id] = g.meta.bonds[id] || { aff: 0 }; if (g.t < (b.cd || 0)) return;
+    const before = bondLv(g.meta, id); b.aff += 8; b.cd = g.t + 20000; const n = NPC[id];
+    gmsg(`${n[1]}: ${n[6][Math.floor(Math.random() * n[6].length)]}`);
+    if (bondLv(g.meta, id) > before) { log(g, `💞 Your bond with ${n[1]} deepens (${bondLv(g.meta, id)}/5).`); leg(g, `${nm(g)} grew closer to ${n[1]}, the ${n[2]}.`); }
+  },
+  gift(el, g) {
+    const id = el.dataset.id, b = g.meta.bonds[id] = g.meta.bonds[id] || { aff: 0 }, c = STR(g.realm) * 300; if (!gSpend(g, 'stones', c, 'spirit stones')) return;
+    const before = bondLv(g.meta, id); b.aff += 30; const n = NPC[id];
+    gmsg(`${n[1]} accepts your gift graciously.`);
+    if (bondLv(g.meta, id) > before) { log(g, `💞 Your bond with ${n[1]} deepens (${bondLv(g.meta, id)}/5).`); leg(g, `${nm(g)} grew closer to ${n[1]}, the ${n[2]}.`); }
+  },
+  spar(el, g, st) {
+    const b = g.meta.bonds.han = g.meta.bonds.han || { aff: 0 }; if (g.t < (b.cd2 || 0)) return;
+    const r = Math.pow(st.pow / rivalPow(g), 2.5), win = Math.random() < r / (1 + r); b.cd2 = g.t + 60000;
+    if (win) { b.aff += 15; const v = st.ins * 120; g.ins += v; log(g, `⚔️ You best Han Feng in a spar. +${nf(v)} insight.`); gmsg('Victory! Han Feng grudgingly nods.'); }
+    else { b.aff += 5; g.age = Math.min(g.age + 1, st.life - 1); log(g, '⚔️ Han Feng defeats you, but respects your effort.'); gmsg('Defeated, but your rival respects you.'); }
+  },
   tab(el) { gTab = el.dataset.id; },
   tap(el, g, st) { g.qi = Math.min(cost(g), g.qi + st.qps * 3); },
   adv(el, g, st) { tryBreak(g, st); },
@@ -473,5 +608,9 @@ ACH.push(
   ['dao10', '🌟', 'True Immortal', 'Reach True Immortal in the Dao Path', () => G().meta.top, 10],
   ['daore', '🔄', 'Wheel of Rebirth', 'Reincarnate in the Dao Path', () => G().meta.lives - 1, 1],
   ['daoasc', '✨', 'Beyond the World', 'Ascend in the Dao Path', () => G().meta.asc, 1],
-  ['daophy', '🧬', 'Many Bodies', 'Unlock 5 physiques', () => Object.keys(G().meta.phys).length, 5]
+  ['daophy', '🧬', 'Many Bodies', 'Unlock 5 physiques', () => Object.keys(G().meta.phys).length, 5],
+  ['daoid', '🪪', 'A Name Among Names', 'Create your Dao Path character', () => G().meta.id.name ? 1 : 0, 1],
+  ['daosect', '🏯', 'Disciple', 'Join a sect in the Dao Path', () => G().meta.sect ? 1 : 0, 1],
+  ['daobond', '💞', 'Sworn Bond', 'Reach bond 5 with someone', () => Math.max(0, ...Object.keys(NPC).map(i => bondLv(G().meta, i))), 5],
+  ['daolegend', '📖', 'Legend in the Making', 'Write 20 legend entries', () => G().meta.legend.length, 20]
 );
