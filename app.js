@@ -1,4 +1,4 @@
-'use strict';
+﻿'use strict';
 // ---------- state ----------
 const KEY = 'foundation.state.v1';
 const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], herb: [], quests: {}, ach: null, tdone: 0, theme: 'dark' });
@@ -217,11 +217,10 @@ const views = {
   settings() { return moreView(); },
   setpage() {
     return `<div class="card"><h2>Theme</h2><button data-act="theme">Toggle light / dark</button></div>
-      <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device. Make a backup code, keep it somewhere safe (notes, email), and paste it here to restore on any device.</p>
-      <div class="row"><button class="pri" data-act="mkcode">Make backup code</button><button data-act="export">Save as file</button></div>
-      ${bcode ? `<p><textarea id="bcode" readonly rows="4" style="font-family:monospace;font-size:.75rem">${esc(bcode)}</textarea></p><div class="row"><button data-act="copycode">Copy code</button><span class="dim">${bcode.length.toLocaleString()} characters</span></div>` : ''}
-      <p><textarea id="rcode" rows="3" placeholder="Paste a backup code here to restore"></textarea></p>
-      <div class="row"><button data-act="usecode">Restore from code</button><label><button onclick="document.getElementById('imp').click()">Restore from file</button><input id="imp" type="file" accept="application/json,.json,text/plain" hidden></label></div></div>
+      <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device.       Export gives you a code to save somewhere safe (notes, email). Import restores from that code on any device.</p>
+            <div class="row"><button class="pri" data-act="export">Export</button><button data-act="import">Import</button></div>
+            ${bmode === 'export' && bcode ? `<p><textarea id="bcode" readonly rows="5" style="font-family:monospace;font-size:.75rem">${esc(bcode)}</textarea></p><div class="row"><button data-act="copycode">Copy code</button><span class="dim">${bcode.length.toLocaleString()} characters</span></div>` : ''}
+            ${bmode === 'import' ? `<p><textarea id="rcode" rows="5" style="font-family:monospace;font-size:.75rem" placeholder="Type or paste your backup code here">${esc(rdraft)}</textarea></p><div class="row"><button class="pri" data-act="usecode">Restore</button></div>` : ''}</div>
       <div class="card"><h2>Delete data</h2><p class="dim">Erase everything stored on this device: practice, journal, library, drawings, herbarium and progress.</p><button data-act="wipe">Delete all data</button></div>
       <div class="card"><h2>Donate</h2><p class="dim">Support the work behind Foundation.</p><button class="pri" data-act="donate">Donate</button></div>
       <div class="card"><h2>About</h2><p class="dim">Foundation — a private, offline app for practice, reflection and story. Install it from your browser menu ("Install app" / "Add to Home Screen").</p></div>`;
@@ -293,24 +292,19 @@ const A = {
     location.reload();
   },
   theme() { S.theme = S.theme === 'light' ? 'dark' : 'light'; },
-  async mkcode() { bcode = await encodeBackup(await gather()); render(); },
+  async export() { bmode = 'export'; bcode = await encodeBackup(await gather()); render(); },
+  import() { bmode = 'import'; bcode = ''; },
   copycode() {
     const t = document.getElementById('bcode'); if (!t) return;
     t.select();
     (navigator.clipboard ? navigator.clipboard.writeText(bcode) : Promise.reject()).catch(() => document.execCommand('copy')).then(() => alert('Code copied.'), () => alert('Code copied.'));
   },
   async usecode() {
-    const t = document.getElementById('rcode').value;
+    const t = rdraft = document.getElementById('rcode').value;
     try { applyBackup(await decodeBackup(t)); } catch { alert('That backup code is not valid.'); }
-  },
-  async export() {
-    const a = document.createElement('a');
-    const data = await gather();
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
-    a.download = `foundation-backup-${today()}.json`; a.click();
   }
 };
-let bcode = '';
+let bcode = '', bmode = '', rdraft = '';
 async function gather() { return Object.assign({}, S, { drawings: await Art.exportAll(), herbPhotos: await Herb.exportPhotos() }); }
 async function pipe(bytes, stream) {
   return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
@@ -338,7 +332,7 @@ function applyBackup(d) {
   const dr = S.drawings, hp = S.herbPhotos; delete S.drawings; delete S.herbPhotos; S.ach = S.ach || null;
   if (!Array.isArray(S.herb)) S.herb = [];
   if (!S.quests || typeof S.quests !== 'object') S.quests = {}; S.drawn = +S.drawn || 0;
-  bcode = '';
+  bcode = ''; bmode = ''; rdraft = '';
   return Promise.all([Art.importAll(dr || []), Herb.importPhotos(hp || [])]).then(() => { save(); render(); alert('Restored.'); });
 }
 function saveTimer() {
@@ -362,7 +356,7 @@ function tick() {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
-  if (t) { tab = t.dataset.tab; q = ''; if (tab === 'settings') moreSub = ''; render(); return; }
+  if (t) { tab = t.dataset.tab; q = ''; if (tab === 'settings') { moreSub = ''; bmode = ''; bcode = ''; rdraft = ''; } render(); return; }
   const b = e.target.closest('button[data-act]');
   if (!b || !A[b.dataset.act]) return;
   A[b.dataset.act](b); save(); render();
@@ -377,11 +371,6 @@ document.addEventListener('keydown', e => {
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.matches('input[type=checkbox][data-act]')) { A[el.dataset.act](el); save(); render(); }
-  if (el.id === 'imp' && el.files[0]) {
-    el.files[0].text().then(txt => {
-      try { applyBackup(JSON.parse(txt)); } catch { alert('Invalid backup file.'); }
-    });
-  }
 });
 document.addEventListener('input', e => {
   if (e.target.id === 'q') {
@@ -398,6 +387,7 @@ if (timer) { if (Date.now() >= timer.end) { S.med.push({ date: today(), min: tim
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
+
 
 
 
