@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 // ---------- state ----------
 const KEY = 'foundation.state.v1';
 const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], herb: [], quests: {}, ach: null, tdone: 0, theme: 'dark' });
@@ -93,7 +93,7 @@ function qiParts() {
     read: S.books.reduce((a, x) => a + (+x.read || 0), 0) * 5,
     tasks: S.tasks.filter(x => x.done).length * 10,
     art: drawQi(S.drawn || 0),
-    herb: herbQi(), quest: questQi(), banked: S.banked || 0
+    herb: herbQi(), chron: chronQi(), quest: questQi(), banked: S.banked || 0
   };
 }
 const qi = () => Object.values(qiParts()).reduce((a, b) => a + b, 0);

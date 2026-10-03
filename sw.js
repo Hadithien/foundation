@@ -1,5 +1,5 @@
-const V = 'foundation-v13';
-const FILES = ['./', 'index.html', 'style.css', 'app.js', 'calligraphy.js', 'extras.js', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
+const V = 'foundation-v14';
+const FILES = ['./', 'index.html', 'style.css', 'app.js', 'calligraphy.js', 'extras.js', 'chronicle.js', 'manifest.webmanifest', 'icon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png'];
 self.addEventListener('install', e => e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(k => Promise.all(k.filter(x => x !== V).map(x => caches.delete(x)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {

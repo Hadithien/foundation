@@ -220,9 +220,10 @@ const hrs = m => m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
 const back = '<button class="back" data-act="sub" data-sub="">‹ More</button>';
 function moreView() {
   const p = pages[moreSub];
-  if (p) return back + p();
+  if (p) return (moreSub === 'chron' ? '' : back) + p();
   const s = stats(), got = ACH.filter(a => a[4](s) >= a[5]).length, o = openQuest();
   const items = [
+    ['chron', '🪶', 'Chronicle', chronStats().total + ' notes'],
     ['ach', '🏆', 'Achievements', `${got} / ${ACH.length}`], ['stats', '📊', 'Stats', `${s.r.total} Qi`],
     ['quests', '🌗', 'Seasonal Quests', o ? `${o.name} is open` : `${s.quests} done`], ['herb', '🌿', 'Herbarium', `${s.herb} sightings`],
     ['sky', '🌅', 'Sky & Light', S.loc ? 'location set' : 'set location'], ['set', '⚙️', 'Settings', 'theme, backup']
@@ -248,7 +249,7 @@ const pages = {
       [s.runs.cur, 'Active-day streak'], [s.runs.best, 'Best active run'], [s.journal, 'Journal entries'], [s.words.toLocaleString(), 'Words written'],
       [hrs(s.medMin), 'Meditation'], [s.drawn, 'Drawings'], [s.chapters, 'Chapters read'], [s.tasks, 'Tasks done'], [s.herb, 'Sightings'], [s.quests, 'Quests']];
     const parts = qiParts(), tot = Object.values(parts).reduce((a, b) => a + b, 0) || 1;
-    const labels = { practice: 'Practices', med: 'Meditation', journal: 'Journal', read: 'Reading', tasks: 'Tasks', art: 'Calligraphy', herb: 'Herbarium', quest: 'Quests', banked: 'Past work' };
+    const labels = { practice: 'Practices', med: 'Meditation', journal: 'Journal', read: 'Reading', tasks: 'Tasks', art: 'Calligraphy', herb: 'Herbarium', quest: 'Quests', chron: 'Chronicle', banked: 'Past work' };
     const d0 = new Date(); d0.setDate(d0.getDate() - 7 * 15 - d0.getDay());
     const cells = []; for (let d = new Date(d0); d <= new Date(); d.setDate(d.getDate() + 1)) { const n = act[ymd(d)] || 0; cells.push(`<i class="${n ? 'l' + Math.min(3, n) : ''}" title="${ymd(d)}: ${n}"></i>`); }
     const days = Object.keys(act).length;
