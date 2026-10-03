@@ -1,0 +1,5 @@
+*.bat
+*.vbs
+serve.py
+__pycache__/
+_*.py
