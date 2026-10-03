@@ -1,9 +1,10 @@
-'use strict';
+﻿'use strict';
 // ---------- state ----------
 const KEY = 'foundation.state.v1';
 const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], herb: [], quests: {}, ach: null, tdone: 0, theme: 'dark' });
 let S = Object.assign(def(), JSON.parse(localStorage.getItem(KEY) || '{}'));
-const save = () => localStorage.setItem(KEY, JSON.stringify(S));
+let wiping = false;
+const save = () => { if (!wiping) localStorage.setItem(KEY, JSON.stringify(S)); };
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const DONATE_URL = ''; // set your donation page here, e.g. 'https://ko-fi.com/yourname'
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -218,6 +219,7 @@ const views = {
     return `<div class="card"><h2>Theme</h2><button data-act="theme">Toggle light / dark</button></div>
       <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device. Export to move it to your phone or another PC.</p>
       <div class="row"><button data-act="export">Export</button><label><button onclick="document.getElementById('imp').click()">Import</button><input id="imp" type="file" accept="application/json,.json,text/plain" hidden></label></div></div>
+      <div class="card"><h2>Delete data</h2><p class="dim">Erase everything stored on this device: practice, journal, library, drawings, herbarium and progress.</p><button data-act="wipe">Delete all data</button></div>
       <div class="card"><h2>Donate</h2><p class="dim">Support the work behind Foundation.</p><button class="pri" data-act="donate">Donate</button></div>
       <div class="card"><h2>About</h2><p class="dim">Foundation — a private, offline app for practice, reflection and story. Install it from your browser menu ("Install app" / "Add to Home Screen").</p></div>`;
   }
@@ -275,6 +277,17 @@ const A = {
       if (!/^[a-z]+:/i.test(u)) u = 'https://' + u;
       try { u = new URL(u); if (u.protocol !== 'https:') throw 0; u = S.donate = u.href; } catch { alert('Please enter a valid https:// link.'); return; } }
     location.href = u;
+  },
+  async wipe() {
+    if (!confirm('Delete ALL Foundation data on this device? This cannot be undone. Export a backup first if unsure.')) return;
+    if (!confirm('Really delete everything?')) return;
+    wiping = true;
+    localStorage.removeItem(KEY);
+    await Promise.all(['foundation-art', 'foundation-herb'].map(n => new Promise(r => {
+      const q = indexedDB.deleteDatabase(n); q.onsuccess = q.onerror = q.onblocked = () => r();
+      setTimeout(r, 1500);
+    })));
+    location.reload();
   },
   theme() { S.theme = S.theme === 'light' ? 'dark' : 'light'; },
   async export() {
@@ -351,6 +364,7 @@ if (timer) { if (Date.now() >= timer.end) { S.med.push({ date: today(), min: tim
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) render(); });
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js');
+
 
 
 
