@@ -198,3 +198,33 @@ div.ev{background:var(--paper);border:1px solid #8a6a3a;border-radius:3px}
 .graph line{stroke:#6b4a22;stroke-opacity:.55;stroke-width:1;vector-effect:non-scaling-stroke}
 button.gnode{position:absolute;transform:translate(-50%,-50%);padding:2px 8px;min-height:0;font-size:.75rem;border-radius:12px;white-space:nowrap;text-transform:none;letter-spacing:0}
 button.gnode.t{background:#1f4d6b;color:#f6efe0}
+/* ---- Chronicle v2: calmer layout ---- */
+.chead{display:flex;gap:8px;align-items:stretch;margin-bottom:12px}
+.chead .seg{flex:1;margin:0;gap:5px}
+button.back.sm{padding:6px 14px;margin:0;font-size:1.3rem;line-height:1}
+button.back.sm.wide{font-size:1rem}
+.seg button{display:flex;flex-direction:column;align-items:center;gap:0;font-size:.78rem;padding:5px 2px}
+.seg button span{font-size:1.15rem}
+.bar2{margin-bottom:10px;flex-wrap:nowrap}
+.bar2 input{min-height:44px}
+.addb{white-space:nowrap;min-height:44px}
+.filters{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.filters::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;padding:5px 12px;font-size:.88rem;border-radius:16px;flex:none}
+.chip.on{background:linear-gradient(#b3261e,#7d1812);color:#f6efe0;border-color:#c99a2e}
+.chip small{opacity:.7}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.grid4 button{display:flex;flex-direction:column;align-items:center;padding:10px 2px;font-size:.85rem}
+.grid4 .em{font-size:1.6rem}
+.newmenu{margin-bottom:10px}
+.empty{text-align:center}
+.empty-note{text-align:center;padding:24px 8px;font-style:italic}
+.hint{margin:0 0 8px;text-align:center}
+.born{display:flex;align-items:center;gap:6px}
+.edtop{margin-bottom:10px}
+input.ttl{width:100%;font:400 1.5rem var(--brush);margin-bottom:10px}
+.ed .tools,.ed .details{margin:10px 0}
+.ed .tools select{width:100%}
+details.help summary{cursor:pointer;color:var(--dim);font-size:.9rem}
+.citem .dim{font-size:.8rem}
+@media (min-width:700px){.chead,.bar2,.filters{max-width:100%}}

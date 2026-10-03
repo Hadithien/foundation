@@ -6,7 +6,7 @@ const KINDS = {
   idea: ['💡', 'Idea', 'Write freely. Link notes with [[double brackets]] and mark topics with #tags.'],
   chapter: ['📖', 'Chapter', 'Once upon a time...']
 };
-const cs = { seg: 'notes', id: '', wid: '', q: '', tag: '', edit: false, manu: false, old: '', showJ: true, rev: false };
+const cs = { seg: 'notes', id: '', wid: '', q: '', tag: '', edit: false, manu: false, old: '', showJ: true, rev: false, kind: '', adding: false, tags: false };
 const P = () => Array.isArray(S.pages) ? S.pages : (S.pages = []);
 const W = () => Array.isArray(S.works) ? S.works : (S.works = []);
 const wc = t => (String(t || '').match(/\S+/g) || []).length;
@@ -79,36 +79,43 @@ const ageAt = d => {
 function prune() {
   S.pages = P().filter(p => p.id === cs.id || (p.title || '').trim() || (p.body || '').trim());
 }
-const seg = () => `<div class="seg">${[['notes', '📚 Notes'], ['timeline', '🗓️ Timeline'], ['novels', '📖 Novels'], ['web', '🕸️ Web']].map(s =>
-  `<button class="${cs.seg === s[0] ? 'on' : ''}" data-act="cseg" data-seg="${s[0]}">${s[1]}</button>`).join('')}</div>`;
+const seg = () => `<div class="chead"><button class="back sm" data-act="sub" data-sub="" aria-label="Back to More">‹</button><div class="seg">${[['notes', '📚', 'Notes'], ['timeline', '🗓️', 'Timeline'], ['novels', '📖', 'Novels'], ['web', '🕸️', 'Web']].map(s =>
+  `<button class="${cs.seg === s[0] ? 'on' : ''}" data-act="cseg" data-seg="${s[0]}"><span>${s[1]}</span> ${s[2]}</button>`).join('')}</div></div>`;
 
 function chronView() {
   const p = cur();
   if (p) return pageView(p);
   const body = cs.seg === 'timeline' ? timelineView() : cs.seg === 'novels' ? novelsView() : cs.seg === 'web' ? webView() : notesView();
-  return back + seg() + body;
+  return seg() + body;
 }
+const newMenu = () => `<div class="card newmenu"><div class="grid4">${['memory', 'person', 'place', 'idea'].map(k => `<button data-act="cnew" data-kind="${k}"><span class="em">${KINDS[k][0]}</span>${KINDS[k][1]}</button>`).join('')}</div></div>`;
 function notesView() {
-  const tags = allTags().slice(0, 14);
-  return `<div class="card"><h2>Chronicle</h2>
-    <p class="dim">Memories, people, places and ideas, linked like a web. Use [[Title]] to link and #tag to group.</p>
-    <div class="row">${['memory', 'person', 'place', 'idea'].map(k => `<button data-act="cnew" data-kind="${k}">${KINDS[k][0]} ${KINDS[k][1]}</button>`).join('')}</div></div>
-    <div class="card"><input class="grow" style="width:100%" id="cq" data-pf="cq" placeholder="Search everything…" value="${esc(cs.q)}">
-    ${tags.length ? `<div class="chips">${cs.tag ? `<button class="tg on" data-act="ctag" data-tag="${esc(cs.tag)}">#${esc(cs.tag)} ✕</button>` : ''}${tags.filter(t => t[0] !== cs.tag).map(t => `<button class="tg" data-act="ctag" data-tag="${esc(t[0])}">#${esc(t[0])} <small>${t[1]}</small></button>`).join('')}</div>` : ''}</div>
+  const all = P().filter(p => p.kind !== 'chapter'), tags = allTags();
+  if (!all.length && !cs.q && !cs.tag) return `<div class="card empty"><h2>Your Chronicle</h2>
+    <p>A private web of your life. Start with something small.</p>${newMenu().replace('card newmenu', 'newmenu')}
+    <p class="dim">Tip: write <b>[[a name]]</b> inside a note to link it to another, and <b>#topic</b> to group notes.</p></div>`;
+  const cnt = k => all.filter(p => p.kind === k).length;
+  const kinds = [['', 'All', all.length], ['memory', 'Memories', cnt('memory')], ['person', 'People', cnt('person')], ['place', 'Places', cnt('place')], ['idea', 'Ideas', cnt('idea')]];
+  return `<div class="row bar2"><input class="grow" id="cq" data-pf="cq" type="search" placeholder="Search notes and journal…" value="${esc(cs.q)}"><button class="addb" data-act="cadd" aria-label="New note">${cs.adding ? '✕' : '＋ New'}</button></div>
+    ${cs.adding ? newMenu() : ''}
+    <div class="filters">${kinds.map(k => `<button class="chip${cs.kind === k[0] ? ' on' : ''}" data-act="ckind" data-kind="${k[0]}">${k[1]} <small>${k[2]}</small></button>`).join('')}${tags.length ? `<button class="chip${cs.tag || cs.tags ? ' on' : ''}" data-act="ctags"># Tags</button>` : ''}</div>
+    ${cs.tag ? `<div class="chips"><button class="tg on" data-act="ctag" data-tag="${esc(cs.tag)}">#${esc(cs.tag)} ✕</button></div>` : ''}
+    ${cs.tags ? `<div class="chips">${tags.filter(t => t[0] !== cs.tag).map(t => `<button class="tg" data-act="ctag" data-tag="${esc(t[0])}">#${esc(t[0])} <small>${t[1]}</small></button>`).join('')}</div>` : ''}
     <div id="clist">${notesList()}</div>`;
 }
 function notesList() {
   const ql = cs.q.trim().toLowerCase();
   let l = P().filter(p => ql || cs.tag ? true : p.kind !== 'chapter');
+  if (cs.kind) l = l.filter(p => p.kind === cs.kind);
   if (cs.tag) l = l.filter(p => parse(p).tags.includes(cs.tag));
   if (ql) l = l.filter(p => ((p.title || '') + ' ' + (p.body || '')).toLowerCase().includes(ql));
   l = l.sort((a, b) => (b.upd || 0) - (a.upd || 0));
-  let html = l.map(p => `<button class="citem" data-act="copen" data-id="${p.id}"><span class="em">${KINDS[p.kind] ? KINDS[p.kind][0] : '📜'}</span><span class="gr"><b>${esc(ptitle(p))}</b><small>${esc(snippet(p, ql))}</small></span><span class="dim">${wc(p.body)} w</span></button>`).join('');
-  if (ql && !cs.tag) {
+  let html = l.map(p => `<button class="citem" data-act="copen" data-id="${p.id}"><span class="em">${KINDS[p.kind] ? KINDS[p.kind][0] : '📜'}</span><span class="gr"><b>${esc(ptitle(p))}</b><small>${esc(snippet(p, ql))}</small></span><span class="dim">${p.date ? p.date.slice(0, 4) : ''}</span></button>`).join('');
+  if (ql && !cs.tag && !cs.kind) {
     const j = S.journal.filter(e => e.text.toLowerCase().includes(ql)).slice(0, 8);
     html += j.map(e => `<button class="citem" data-act="ctojournal" data-q="${esc(cs.q.trim())}"><span class="em">🖋️</span><span class="gr"><b>Journal · ${e.date}</b><small>${esc(e.text.replace(/\s+/g, ' ').slice(0, 90))}</small></span></button>`).join('');
   }
-  return html || `<div class="card dim" style="text-align:center">${ql || cs.tag ? 'Nothing found.' : 'Nothing here yet. Record your first memory above.'}</div>`;
+  return html || `<div class="dim empty-note">${ql || cs.tag || cs.kind ? 'Nothing found.' : 'Nothing here yet.'}</div>`;
 }
 
 function timelineView() {
@@ -128,14 +135,10 @@ function timelineView() {
     html += it.id ? `<button class="ev" data-act="copen" data-id="${it.id}">${body}</button>`
       : it.j ? `<button class="ev jr" data-act="ctojournal" data-q="">${body}</button>` : `<div class="ev born">${body}</div>`;
   }
-  return `<div class="card"><h2>Life Timeline</h2>
-    <div class="row"><label class="dim">Born <input type="date" data-pf="born" value="${esc(S.born || '')}"></label>
-    <button data-act="cshowj">${cs.showJ ? 'Hide' : 'Show'} journal</button><button data-act="crev">${cs.rev ? 'Oldest first' : 'Newest first'}</button>
-    <button data-act="cnew" data-kind="memory">＋ Memory</button></div>
-    ${cs.tag ? `<div class="chips"><button class="tg on" data-act="ctag" data-tag="${esc(cs.tag)}">#${esc(cs.tag)} ✕</button></div>` : ''}
-    <p class="dim">Give a memory a date and it appears here. Add an end date for a span of life, like school years.</p></div>
-    ${html ? `<div class="tl">${html}</div>` : '<div class="card dim" style="text-align:center">No dated entries yet. Add a memory with a date.</div>'}
-    ${undated.length ? `<div class="card"><h2>Undated memories</h2>${undated.map(p => `<button class="citem" data-act="copen" data-id="${p.id}"><span class="em">📜</span><span class="gr"><b>${esc(ptitle(p))}</b></span></button>`).join('')}</div>` : ''}`;
+  return `<div class="row bar2"><label class="dim born">Born <input type="date" data-pf="born" value="${esc(S.born || '')}"></label><span class="grow"></span><button class="addb" data-act="cnew" data-kind="memory">＋ Memory</button></div>
+    <div class="filters"><button class="chip${cs.showJ ? ' on' : ''}" data-act="cshowj">🖋️ Journal</button><button class="chip" data-act="crev">${cs.rev ? '↑ Oldest first' : '↓ Newest first'}</button>${cs.tag ? `<button class="tg on" data-act="ctag" data-tag="${esc(cs.tag)}">#${esc(cs.tag)} ✕</button>` : ''}</div>
+    ${html ? `<div class="tl">${html}</div>` : '<div class="dim empty-note">Nothing on the timeline yet. Add a memory with a date, and set your birth date to see ages.</div>'}
+    ${undated.length ? `<div class="card"><h2>Undated memories</h2><p class="dim">Open one and set a date to place it on the timeline.</p>${undated.map(p => `<button class="citem" data-act="copen" data-id="${p.id}"><span class="em">📜</span><span class="gr"><b>${esc(ptitle(p))}</b></span></button>`).join('')}</div>` : ''}`;
 }
 
 // ---------- novels ----------
@@ -145,10 +148,9 @@ function novelsView() {
   const w = W().find(x => x.id === cs.wid);
   if (!w) {
     const l = W();
-    return `<div class="card"><h2>Novels</h2><p class="dim">Write long stories chapter by chapter. Every 100 words earns 2 Qi.</p>
-      <div class="row"><input class="grow" id="wtitle" placeholder="Title of a new novel"><button class="pri" data-act="cnewwork">Begin</button></div></div>
+    return `<div class="row bar2"><input class="grow" id="wtitle" placeholder="Title of a new novel…"><button class="addb pri" data-act="cnewwork">＋ Begin</button></div>
       ${l.map(x => { const n = workWords(x.id); return `<button class="citem" data-act="cwork" data-id="${x.id}"><span class="em">📕</span><span class="gr"><b>${esc(x.title || 'Untitled')}</b><small>${chaptersOf(x.id).length} chapters · ${n.toLocaleString()} words${x.goal ? ' · ' + Math.min(100, Math.round(n / x.goal * 100)) + '%' : ''}</small></span></button>`; }).join('')
-      || '<div class="card dim" style="text-align:center">No novels yet. Name one above and begin.</div>'}`;
+      || '<div class="dim empty-note">No novels yet. Name one above and begin. Every 100 words earns 2 Qi.</div>'}`;
   }
   const chs = chaptersOf(w.id), n = chs.reduce((a, c) => a + wc(c.body), 0);
   if (cs.manu) return `<div class="row sb"><button class="back" data-act="cmanu">‹ ${esc(w.title || 'Novel')}</button><button data-act="cdl">Download .txt</button></div>
@@ -211,7 +213,7 @@ function webView() {
     for (const t of r.links) { const q = byTitle(t), b = q && ix.get('p' + q.id); if (b !== undefined && b !== a && !seen.has(a + '-' + b) && !seen.has(b + '-' + a)) { seen.add(a + '-' + b); edges.push([a, b]); } }
     for (const t of r.tags) { const b = ix.get('t' + t); if (b !== undefined) edges.push([a, b]); }
   }
-  const head = `<div class="card"><h2>Web of Memory</h2><p class="dim">Notes joined by [[links]] and shared #tags. Tap a node to open it.</p></div>`;
+  const head = `<p class="dim hint">Notes joined by links and shared tags. Tap one to open it.</p>`;
   if (nodes.length < 2 || !edges.length) return head + `<div class="card dim" style="text-align:center">The web grows as you link notes. Write [[Title]] inside a note to connect it to another.</div>`;
   const key = nodes.map(c => c.key).join() + '|' + edges.length;
   if (gcache.key !== key) gcache = { key, pos: layout(nodes.length, edges) };
@@ -228,17 +230,18 @@ function webView() {
 function pageView(p) {
   const kind = KINDS[p.kind] || KINDS.memory, isCh = p.kind === 'chapter';
   const w = isCh && W().find(x => x.id === p.work);
-  const bk = `<button class="back" data-act="cclose">‹ ${isCh ? esc(w ? w.title || 'Novel' : 'Novel') : 'Chronicle'}</button>`;
+  const bk = `<button class="back sm wide" data-act="cclose">‹ ${isCh ? esc(w ? w.title || 'Novel' : 'Novel') : 'Chronicle'}</button>`;
   if (cs.edit) {
     const others = P().filter(x => x.id !== p.id && (x.title || '').trim()).sort((a, b) => a.title.localeCompare(b.title));
-    return bk + `<div class="card ed">
-      <div class="row">${isCh ? `<span class="dim">📖 Chapter</span>` : `<select data-pf="kind">${['memory', 'person', 'place', 'idea'].map(k => `<option value="${k}"${p.kind === k ? ' selected' : ''}>${KINDS[k][0]} ${KINDS[k][1]}</option>`).join('')}</select>`}
-      <input class="grow" data-pf="title" placeholder="${isCh ? 'Chapter title' : 'Title'}" value="${esc(p.title || '')}"></div>
-      ${isCh ? '' : `<div class="row"><label class="dim">When <input type="date" data-pf="date" value="${esc(p.date || '')}"></label><label class="dim">until <input type="date" data-pf="end" value="${esc(p.end || '')}"></label></div>`}
-      <div class="row"><select data-pf="ins"><option value="">＋ Insert link…</option>${others.map(x => `<option value="${esc(x.title)}">${esc(x.title)}</option>`).join('')}</select></div>
-      <textarea id="cbody" data-pf="body" rows="16" style="min-height:300px" placeholder="${esc(kind[2])}">${esc(p.body || '')}</textarea>
-      <div class="row sb"><span class="dim" id="cwc">${wc(p.body)} words · +${pageQi(p)} Qi</span><span><button data-act="cdone">Done</button> <button class="x" data-act="cdel">🗑 Delete</button></span></div>
-      <p class="dim">[[Title]] links to a note · #tag groups notes · **bold** · *italic* · # Heading. Saved as you type.</p></div>`;
+    return `<div class="row sb edtop"><button class="back sm wide" data-act="cdone">‹ Done</button><span class="dim" id="cwc">${wc(p.body)} words · +${pageQi(p)} Qi</span></div>
+    <div class="card ed">
+      <input class="ttl" data-pf="title" placeholder="${isCh ? 'Chapter title' : 'Title'}" value="${esc(p.title || '')}">
+      <textarea id="cbody" data-pf="body" rows="14" style="min-height:280px" placeholder="${esc(kind[2])}">${esc(p.body || '')}</textarea>
+      <div class="row tools"><select data-pf="ins" aria-label="Insert link"><option value="">🔗 Link to…</option>${others.map(x => `<option value="${esc(x.title)}">${esc(x.title)}</option>`).join('')}</select></div>
+      ${isCh ? '' : `<div class="row details"><select data-pf="kind" aria-label="Type">${['memory', 'person', 'place', 'idea'].map(k => `<option value="${k}"${p.kind === k ? ' selected' : ''}>${KINDS[k][0]} ${KINDS[k][1]}</option>`).join('')}</select>
+      <label class="dim">When <input type="date" data-pf="date" value="${esc(p.date || '')}"></label><label class="dim">until <input type="date" data-pf="end" value="${esc(p.end || '')}"></label></div>`}
+      <details class="help"><summary>Writing tips</summary><p class="dim">[[Title]] links to a note · #tag groups notes · **bold** · *italic* · # Heading · it saves as you type.</p></details>
+      <div class="row sb"><span></span><button class="x" data-act="cdel">🗑 Delete</button></div></div>`;
   }
   const r = parse(p), mine = (p.title || '').trim().toLowerCase();
   const back_ = mine ? P().filter(x => x.id !== p.id && parse(x).links.includes(mine)) : [];
@@ -262,6 +265,7 @@ function pageView(p) {
 
 // ---------- actions ----------
 function openPage(p, edit) {
+  cs.adding = false;
   cs.id = p.id; cs.edit = !!edit; cs.old = (p.title || '').trim();
   if (p.kind === 'chapter') { cs.seg = 'novels'; cs.wid = p.work || ''; }
   prune(); window.scrollTo(0, 0);
@@ -271,7 +275,7 @@ function newPage(kind, extra) {
   P().push(p); openPage(p, true);
 }
 const XC = {
-  cseg(el) { prune(); cs.id = ''; cs.seg = el.dataset.seg; cs.wid = ''; cs.manu = false; cs.tag = ''; cs.q = ''; tab = 'settings'; moreSub = 'chron'; window.scrollTo(0, 0); },
+  cseg(el) { prune(); cs.id = ''; cs.seg = el.dataset.seg; cs.wid = ''; cs.manu = false; cs.tag = ''; cs.q = ''; cs.kind = ''; cs.adding = false; cs.tags = false; tab = 'settings'; moreSub = 'chron'; window.scrollTo(0, 0); },
   cnew(el) {
     tab = 'settings'; moreSub = 'chron';
     if (el.dataset.kind === 'chapter') { const chs = chaptersOf(el.dataset.w); newPage('chapter', { work: el.dataset.w, ord: chs.length ? (chs[chs.length - 1].ord || 0) + 1 : 1 }); }
@@ -290,6 +294,9 @@ const XC = {
     if (p) openPage(p, false); else newPage('idea', { title: t, date: '' });
   },
   ctag(el) { const t = el.dataset.tag; cs.tag = cs.tag === t && cs.seg === 'notes' ? '' : t; if (cs.seg !== 'timeline') cs.seg = 'notes'; cs.id = ''; cs.q = ''; tab = 'settings'; moreSub = 'chron'; prune(); },
+  cadd() { cs.adding = !cs.adding; },
+  ckind(el) { cs.kind = el.dataset.kind; },
+  ctags() { cs.tags = !cs.tags; },
   cshowj() { cs.showJ = !cs.showJ; },
   crev() { cs.rev = !cs.rev; },
   ctojournal(el) { tab = 'journal'; q = el.dataset.q || ''; window.scrollTo(0, 0); },
