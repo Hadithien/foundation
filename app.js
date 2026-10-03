@@ -1,7 +1,7 @@
 'use strict';
 // ---------- state ----------
 const KEY = 'foundation.state.v1';
-const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], theme: 'dark' });
+const def = () => ({ habits: [], journal: [], books: [], tasks: [], drawn: 0, banked: 0, asc: 0, ascBase: 0, med: [], herb: [], quests: {}, ach: null, tdone: 0, theme: 'dark' });
 let S = Object.assign(def(), JSON.parse(localStorage.getItem(KEY) || '{}'));
 const save = () => localStorage.setItem(KEY, JSON.stringify(S));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -84,14 +84,18 @@ const medRate = min => MED_TIERS.reduce((a, x) => min >= x[0] ? x[1] : a, 1);
 const medQi = min => Math.round(min * medRate(min));
 const drawQiAt = n => 10 + 2 * Math.floor((n - 1) / 5); // nth saved drawing
 const drawQi = n => { let t = 0; for (let i = 1; i <= n; i++) t += drawQiAt(i); return t; };
-function qi() {
-  const h = S.habits.reduce((a, x) => a + habitQi(x), 0);
-  const m = S.med.reduce((a, x) => a + medQi(x.min), 0);
-  const j = S.journal.reduce((a, x) => a + (x.qi ?? 10), 0);
-  const r = S.books.reduce((a, x) => a + (+x.read || 0), 0) * 5;
-  const t = S.tasks.filter(x => x.done).length * 10;
-  return h + m + j + r + t + drawQi(S.drawn || 0) + (S.banked || 0);
+function qiParts() {
+  return {
+    practice: S.habits.reduce((a, x) => a + habitQi(x), 0),
+    med: S.med.reduce((a, x) => a + medQi(x.min), 0),
+    journal: S.journal.reduce((a, x) => a + (x.qi ?? 10), 0),
+    read: S.books.reduce((a, x) => a + (+x.read || 0), 0) * 5,
+    tasks: S.tasks.filter(x => x.done).length * 10,
+    art: drawQi(S.drawn || 0),
+    herb: herbQi(), quest: questQi(), banked: S.banked || 0
+  };
 }
+const qi = () => Object.values(qiParts()).reduce((a, b) => a + b, 0);
 function realm() {
   const w = world(), R = w.realms, total = qi(), q = total - (S.ascBase || 0);
   let i = 0;
@@ -151,7 +155,7 @@ const TABS = [['today', 'today', 'Today'], ['practice', 'practice', 'Practice'],
 const lists = {
   journal() {
     const l = S.journal.filter(e => !q || (e.text + e.mood).toLowerCase().includes(q.toLowerCase())).sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id));
-    return l.map(e => `<div class="card"><div class="row sb"><span class="dim">${e.date} · ${esc(e.mood)} ? +${e.qi ?? 10} Qi</span><button class="x" data-act="delj" data-id="${e.id}">✕</button></div><div style="white-space:pre-wrap">${esc(e.text)}</div></div>`).join('')
+    return l.map(e => `<div class="card"><div class="row sb"><span class="dim">${e.date} · ${esc(e.mood)} · +${e.qi ?? 10} Qi</span><button class="x" data-act="delj" data-id="${e.id}">✕</button></div><div style="white-space:pre-wrap">${esc(e.text)}</div></div>`).join('')
       || `<div class="card dim" style="text-align:center">${q ? 'No entries match.' : 'No entries yet. Write your first one above.'}</div>`;
   }
 };
@@ -162,7 +166,7 @@ const views = {
     return `<div class="card"><div class="row sb"><div><div class="dim">${new Date().toDateString()}</div>
       <div class="big">${moonSvg()}</div><div>${m.name} <span class="dim">· day ${m.age}</span></div></div>
       <div style="text-align:right"><div class="tree">${ic('grove', 22)} ${t[2]}</div><div class="dim">${t[3]}</div>
-      <div class="dim">${f.days === 0 ? 'Today: ' : 'Next: '}${f.name}${f.days ? ' in ' + f.days + 'd' : ''}</div></div></div></div>
+      <div class="dim">${f.days === 0 ? 'Today: ' : 'Next: '}${f.name}${f.days ? ' in ' + f.days + 'd' : ''}</div></div></div>${todayExtras()}</div>
       <div class="card"><h2>${ic('meditate', 24)} Cultivation: ${r.name}</h2><div class="dim" style="text-align:center">${r.world}${S.asc ? ' · Ascension ' + S.asc : ''}</div><div class="bar"><i style="width:${r.pct}%"></i></div>
       <div class="dim">${r.q} Qi${r.next ? ' · ' + r.need + ' to ' + r.next : r.canAscend ? ' · Peak reached' : ' · Max realm reached'}</div>${r.canAscend ? `<p style="text-align:center"><button class="pri" data-act="ascend">☯ Ascend to ${WORLDS[(S.asc || 0) + 1].name}</button></p>` : ''}</div>
       <div class="card"><h2>${ic('journal', 24)} Oracle</h2><div class="quote" id="oracle">${esc(oracleText || dayOracle())}</div>
@@ -181,7 +185,7 @@ const views = {
   },
   journal() {
     return `<div class="card"><div class="row"><select id="jm"><option>🌿 Calm</option><option>🔥 Driven</option><option>🌧️ Heavy</option><option>✨ Inspired</option><option>🌙 Reflective</option></select>
-      <input type="date" id="jd" value="${today()}"></div><p><textarea id="jt" placeholder="What did the forest teach you today?"></textarea></p><button class="pri" data-act="addj">Save entry</button> <span class="dim">Each entry gives 10 Qi, +1 per 100 characters written (max 20).</span></div>
+      <input type="date" id="jd" value="${today()}"></div>${promptBlock()}<p><textarea id="jt" placeholder="What did the forest teach you today?">${esc(jdraft)}</textarea></p><button class="pri" data-act="addj">Save entry</button> <span class="dim">Each entry gives 10 Qi, +1 per 100 characters written (max 20).</span></div>
       <div class="card"><input class="grow" style="width:100%" id="q" placeholder="Search…" value="${esc(q)}"></div><div id="list">${lists.journal()}</div>`;
   },
   library() {
@@ -209,7 +213,8 @@ const views = {
       <p class="dim" style="text-align:center">Longer sits earn more Qi per minute: ${MED_TIERS.map(x => x[0] + 'm x' + x[1]).join(', ')}</p>
       <p class="dim" style="text-align:center">Today: ${td} min · Total: ${total} min = ${S.med.reduce((a, x) => a + medQi(x.min), 0)} Qi</p></div>`;
   },
-  settings() {
+  settings() { return moreView(); },
+  setpage() {
     return `<div class="card"><h2>Theme</h2><button data-act="theme">Toggle light / dark</button></div>
       <div class="card"><h2>Backup</h2><p class="dim">All data lives on this device. Export to move it to your phone or another PC.</p>
       <div class="row"><button data-act="export">Export</button><label><button onclick="document.getElementById('imp').click()">Import</button><input id="imp" type="file" accept="application/json,.json,text/plain" hidden></label></div></div>
@@ -225,6 +230,7 @@ function render() {
   document.getElementById('tabs').innerHTML = TABS.map(t => `<button class="${tab === t[0] ? 'on' : ''}" data-tab="${t[0]}"><b>${ic(t[1], 28)}</b>${t[2]}</button>`).join('');
   document.getElementById('view').innerHTML = views[tab]();
   badge();
+  extrasAfter();
   if (tab === 'art' && window.Art) Art.mount(document.getElementById('art-root'));
 }
 function badge() { const r = realm(); document.getElementById('realm-badge').textContent = `${r.name} · ${r.q} Qi`; }
@@ -236,7 +242,7 @@ const A = {
   hab(el) { const h = S.habits.find(x => x.id === el.dataset.id); el.checked ? h.log[today()] = 1 : delete h.log[today()]; },
   addhab() { const n = val('hn'); if (n) S.habits.push({ id: uid(), name: n, log: {} }); },
   delhab(el) { if (confirm('Delete this practice?')) { const h = S.habits.find(x => x.id === el.dataset.id); S.banked = (S.banked || 0) + (h ? habitQi(h) : 0); } else return; S.habits = S.habits.filter(x => x.id !== el.dataset.id); },
-  addj() { const t = val('jt'); if (t) S.journal.push({ id: uid(), date: val('jd') || today(), mood: val('jm'), text: t, qi: journalQi(t) }); },
+  addj() { const t = val('jt'); if (t) { S.journal.push({ id: uid(), date: val('jd') || today(), mood: val('jm'), text: t, qi: journalQi(t) }); jdraft = ''; } },
   delj(el) { if (!confirm('Delete entry?')) return; const e = S.journal.find(x => x.id === el.dataset.id); S.banked = (S.banked || 0) + (e ? e.qi ?? 10 : 0); S.journal = S.journal.filter(x => x.id !== el.dataset.id); },
   addbook() { const t = val('bt'); if (t) S.books.push({ id: uid(), title: t, author: val('ba'), total: +val('bt2') || 0, read: 0, status: val('bs') }); },
   delbook(el) { if (confirm('Remove book?')) S.books = S.books.filter(x => x.id !== el.dataset.id); },
@@ -247,8 +253,8 @@ const A = {
   },
   addtask() { const t = val('tn'); if (t) S.tasks.push({ id: uid(), text: t, done: false }); },
   task(el) { S.tasks.find(x => x.id === el.dataset.id).done = el.checked; },
-  deltask(el) { const d = S.tasks.find(x => x.id === el.dataset.id); if (d && d.done) S.banked = (S.banked || 0) + 10; S.tasks = S.tasks.filter(x => x.id !== el.dataset.id); },
-  cleartasks() { S.banked = (S.banked || 0) + S.tasks.filter(x => x.done).length * 10; S.tasks = S.tasks.filter(x => !x.done); },
+  deltask(el) { const d = S.tasks.find(x => x.id === el.dataset.id); if (d && d.done) { S.banked = (S.banked || 0) + 10; S.tdone = (S.tdone || 0) + 1; } S.tasks = S.tasks.filter(x => x.id !== el.dataset.id); },
+  cleartasks() { S.tdone = (S.tdone || 0) + S.tasks.filter(x => x.done).length; S.banked = (S.banked || 0) + S.tasks.filter(x => x.done).length * 10; S.tasks = S.tasks.filter(x => !x.done); },
   startmed() { const m = +val('mm'); timer = { start: Date.now(), end: Date.now() + m * 6e4, min: m }; saveTimer(); tick(); },
   stopmed() {
     const done = Math.floor((Date.now() - timer.start) / 6e4);
@@ -273,7 +279,7 @@ const A = {
   theme() { S.theme = S.theme === 'light' ? 'dark' : 'light'; },
   async export() {
     const a = document.createElement('a');
-    const data = Object.assign({}, S, { drawings: await Art.exportAll() });
+    const data = Object.assign({}, S, { drawings: await Art.exportAll(), herbPhotos: await Herb.exportPhotos() });
     a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
     a.download = `foundation-backup-${today()}.json`; a.click();
   }
@@ -299,7 +305,7 @@ function tick() {
 
 document.addEventListener('click', e => {
   const t = e.target.closest('[data-tab]');
-  if (t) { tab = t.dataset.tab; q = ''; render(); return; }
+  if (t) { tab = t.dataset.tab; q = ''; if (tab === 'settings') moreSub = ''; render(); return; }
   const b = e.target.closest('button[data-act]');
   if (!b || !A[b.dataset.act]) return;
   A[b.dataset.act](b); save(); render();
@@ -322,8 +328,10 @@ document.addEventListener('change', e => {
         if (!confirm('Replace everything on this device with the imported backup?')) return;
         S = Object.assign(base, d);
         for (const k of ['habits', 'journal', 'books', 'tasks', 'med']) if (!Array.isArray(S[k])) S[k] = [];
-        const dr = S.drawings; delete S.drawings; S.drawn = +S.drawn || 0;
-        Art.importAll(dr || []).then(() => { save(); render(); alert('Imported.'); });
+        const dr = S.drawings, hp = S.herbPhotos; delete S.drawings; delete S.herbPhotos; S.ach = S.ach || null;
+        if (!Array.isArray(S.herb)) S.herb = [];
+        if (!S.quests || typeof S.quests !== 'object') S.quests = {}; S.drawn = +S.drawn || 0;
+        Promise.all([Art.importAll(dr || []), Herb.importPhotos(hp || [])]).then(() => { save(); render(); alert('Imported.'); });
       } catch { alert('Invalid backup file.'); }
     });
   }
@@ -336,6 +344,7 @@ document.addEventListener('input', e => {
   }
 });
 
+Object.assign(A, XA);
 Art.init({ onNew() { S.drawn = (S.drawn || 0) + 1; save(); badge(); return drawQiAt(S.drawn); } });
 render();
 if (timer) { if (Date.now() >= timer.end) { S.med.push({ date: today(), min: timer.min }); timer = null; saveTimer(); save(); render(); } else tick(); }
